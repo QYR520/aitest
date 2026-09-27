@@ -125,13 +125,25 @@ class LangfuseTracer:
 
 
 def get_tracer(cfg: dict, model: str | None = None):
-    """根据 langfuse 配置返回可用的 tracer（无 key 或未装库时降级 no-op）。"""
+    """按「是否有 key」决定是否启用：优先取 config，其次读环境变量。
+
+    这样 CI 里只要注入 LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY 环境变量，
+    无需把 key 写进仓库，就能自动上报 trace。
+    """
+    import os
+
     c = cfg or {}
-    if not (c.get("enabled") and c.get("public_key") and c.get("secret_key")):
+    public_key = c.get("public_key") or os.environ.get("LANGFUSE_PUBLIC_KEY", "")
+    secret_key = c.get("secret_key") or os.environ.get("LANGFUSE_SECRET_KEY", "")
+    host = c.get("host") or os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    if not (public_key and secret_key):
         return NoopTracer()
     try:
         import langfuse  # noqa: F401  检查依赖是否已安装
     except ImportError:
         print("[langfuse] 未安装 langfuse，跳过可观测上报（pip install langfuse）")
         return NoopTracer()
-    return LangfuseTracer(c, model=model)
+    return LangfuseTracer(
+        {"public_key": public_key, "secret_key": secret_key, "host": host},
+        model=model,
+    )

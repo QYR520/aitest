@@ -12,6 +12,11 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Langfuse 上报：在仓库 Settings→Secrets 配好这两个变量后，CI 跑评测会自动把 trace 上传
+    # 未配置时为空，自动降级为不上报（mock 模式照常跑）
+    env:
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
 
     steps:
       - name: 检出代码
