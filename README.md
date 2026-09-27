@@ -95,3 +95,15 @@ phase5/
 
 传统测试 `== 断言对错`；AI 测试对同一条输出**按维度打分**（准确性/幻觉/工具/检索…），
 一条输出可能「相关性过、准确性挂」，从而定位是「检索错了」还是「prompt 没约束好」。
+
+## 可观测性（trace → Langfuse）
+
+跑评测时，每个用例的执行轨迹（意图路由 / 检索命中的文档及分数 / 工具调用 / token 用量 / 延迟）
+会被上报到 **Langfuse** 可视化平台，你可以点开每一条 trace 看 SUT 内部到底怎么跑的。
+
+开启（默认关闭，随便跑 mock 不受影响）：
+
+1. 到 <https://cloud.langfuse.com> 注册并创建项目，复制 `public_key`(pk-lf-…) 和 `secret_key`(sk-lf-…)
+2. `config.yaml` 里把 `langfuse.enabled` 改 `true`，填入两个 key
+3. `pip install langfuse`
+4. 重新 `python run.py`，打开 Langfuse 页面就能看到评测的 trace 和每个维度的 Score

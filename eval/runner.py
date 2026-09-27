@@ -16,6 +16,7 @@ from sut.llm import LLMClient
 from sut.agent import CustomerServiceAgent
 from eval.judges import Verdict, judge_exact, judge_semantic, LLMJudge
 from eval.metrics import compute_retrieval
+from eval.tracing import get_tracer
 from eval.safety import evaluate_safety
 
 REJECT_WORDS = ["抱歉", "无法", "没有相关信息"]
@@ -35,13 +36,17 @@ class TestRunner:
                               self.embedder)
         self.agent = CustomerServiceAgent(config["sut"], self.kb, self.llm,
                                           prompt_fn=prompt_fn)
+        # 可观测性：把每个用例的执行轨迹(trace)上报 Langfuse（无 key 时自动 no-op）
+        self.tracer = get_tracer(config.get("langfuse"), model=self.llm.model)
 
     # ---------- 主流程 ----------
     def run(self) -> dict:
         results = []
         for case in self.suite["cases"]:
             results.append(self.run_case(case))
-        return self._summarize(results)
+        summary = self._summarize(results)
+        self.tracer.flush()  # 把已上报的 trace 推送到 Langfuse
+        return summary
 
     def run_case(self, case: dict) -> dict:
         history: list[str] = []
@@ -117,7 +122,7 @@ class TestRunner:
         # 综合通过：所有 Verdict 维度都 passed（retrieval 是诊断指标，不强制）
         passed = all(v.passed for v in verdicts.values())
 
-        return {
+        result = {
             "id": case["id"],
             "category": case.get("category", ""),
             "question": " | ".join(case["turns"]),
@@ -127,6 +132,8 @@ class TestRunner:
             "passed": passed,
             "trace": last_trace,
         }
+        self.tracer.record_case(result)  # 上报 trace + 各维度打分到 Langfuse
+        return result
 
     # ---------- 汇总 ----------
     def _summarize(self, results: list[dict]) -> dict:

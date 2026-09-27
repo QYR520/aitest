@@ -36,3 +36,15 @@ run:
   consistency_case: TC01   # 一致性测试用的用例
   suite_file: "data/test_suites/customer_service_v1.yaml"
   report_dir: "reports"
+
+# Langfuse 可观测（可选）：把每个用例的执行轨迹(trace)上报到 Langfuse 可视化
+# 默认关闭。开启步骤：
+#   1. 到 https://cloud.langfuse.com 注册并创建项目，拿到 public_key(pk-lf-...) 和 secret_key(sk-lf-...)
+#   2. enabled 改 true，填入两个 key
+#   3. pip install langfuse
+# 自托管：host 改成你的自托管地址（如 http://localhost:3000）
+langfuse:
+  enabled: false
+  public_key: ""           # pk-lf-...
+  secret_key: ""           # sk-lf-...
+  host: "https://cloud.langfuse.com"
