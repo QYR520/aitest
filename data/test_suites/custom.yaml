@@ -1,0 +1,15 @@
+suite:
+  name: 自定义评测集
+  description: 用户在 Web 上添加的用例
+cases:
+- id: CU01
+  category: accuracy_semantic
+  turns:
+  - 退货几天内可退？
+  golden:
+    answer: 7天内可以退货
+    relevant_doc_ids:
+    - D1
+  judge:
+    type: semantic
+    threshold: 0.35

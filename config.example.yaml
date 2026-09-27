@@ -1,0 +1,38 @@
+# LLM Test Runner 配置（模板，可安全入库）
+#
+# 本地使用：复制成 config.yaml 再按需填写真实信息
+#   cp config.example.yaml config.yaml
+#
+# 说明：config.yaml 因包含 api_key 已被 .gitignore 忽略，不会提交到 GitHub。
+# CI 里会自动用本模板生成 config.yaml 并走 mock 模式（无需 key）。
+
+# 评测原则：temperature 固定低温，保证结果可控、可归因（第 2 周「控制变量」铁律）
+
+llm:
+  provider: mock           # mock（离线可跑） | openai（真实 API）
+  model: "deepseek-v4-pro"
+  base_url: "https://api.deepseek.com"   # openai 兼容接口地址（provider=openai 时必填，换成你平台的地址）
+  api_key: ""              # 你的平台 key；留空则强制走 mock
+  temperature: 0.1        # 评测统一低温；改成 >=0.5 可观察「随机性导致不一致」
+  # 缺陷开关：置 true 演示「测试能抓住 bug」
+  flaw:
+    hallucinate: false    # true = 检索不到时编造答案（幻觉），而非拒答
+
+# LLM-as-Judge 的裁判模型（可选）：缺省复用上面的 llm。
+# 业界实践：法官通常用比被测系统「更强/更稳定」的模型来打分，且温度要更冷。
+# llm_judge:
+#   provider: mock
+#   model: "gpt-4o"
+#   temperature: 0.0        # 法官必须更冷，否则打分数抖动、不可复现
+
+sut:
+  name: customer_service_agent
+  knowledge_base_dir: "data/knowledge_base"
+  top_k: 2                                    # RAG 检索返回条数（用于 Recall@k）
+  retrieval_min_score: 0.78                   # 相似度低于阈值 → 视为无相关 → 拒答
+
+run:
+  consistency_n: 10        # 一致性测试跑的次数
+  consistency_case: TC01   # 一致性测试用的用例
+  suite_file: "data/test_suites/customer_service_v1.yaml"
+  report_dir: "reports"

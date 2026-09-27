@@ -1,0 +1,60 @@
+name: LLM Test Runner CI
+
+# 独立仓库：整个仓库就是 LLM Test Runner 项目
+# 触发：push / PR / 手动
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # bge-small-zh 语义模型约 100MB，缓存后二次 CI 快很多
+      - name: 缓存 embedding 模型
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: bge-small-zh-v1
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          # 先装 CPU 版 torch，避免拉 2GB 的 CUDA 版
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # sentence-transformers 用于加载 bge-small-zh 做语义判定
+          pip install sentence-transformers
+          pip install -r requirements.txt
+
+      - name: 准备配置（mock 模式，无需 api_key）
+        run: cp config.example.yaml config.yaml
+
+      - name: 端到端自测（pytest 门禁）
+        env:
+          HF_HUB_OFFLINE: "0"   # 允许下载 bge 模型（覆盖 embedder 里的离线默认）
+        run: python -m pytest -q
+
+      - name: 全量评测并生成报告
+        env:
+          HF_HUB_OFFLINE: "0"
+        run: python run.py
+
+      # 无论测试是否通过都上传报告，方便下载排查
+      - name: 上传评测报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: reports/

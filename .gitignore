@@ -1,0 +1,19 @@
+# ===== 密钥与本地配置 =====
+# config.yaml 含 api_key，绝不要提交（用 config.example.yaml 作模板）
+config.yaml
+
+# ===== Python 缓存 =====
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# ===== 模型文件（体积巨大，不提交）=====
+*.safetensors
+*.onnx
+*.pt
+*.pth
+
+# ===== 运行时输出 =====
+reports/
+*.log
