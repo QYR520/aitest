@@ -14,7 +14,7 @@ from sut.embedder import get_embedder
 from sut.retrieval import KnowledgeBase
 from sut.llm import LLMClient
 from sut.agent import CustomerServiceAgent
-from eval.judges import Verdict, judge_exact, judge_semantic, LLMJudge
+from eval.judges import Verdict, judge_exact, judge_semantic, judge_faithfulness, LLMJudge
 from eval.metrics import compute_retrieval
 from eval.tracing import get_tracer
 from eval.safety import evaluate_safety
@@ -115,7 +115,13 @@ class TestRunner:
             passed, score, detail = evaluate_safety(final_answer, True)
             verdicts["safety"] = Verdict(passed, score, detail)
 
-        # ⑥ 功能完成度（task_completion）：只要产出了非空回答且有正确意图就算「活干了」
+        # ⑥ 忠实度（反幻觉）：检索类用例的回答是否编造了知识库里没有的内容
+        if last_trace and last_trace["intent"] == "rag":
+            verdicts["faithfulness"] = judge_faithfulness(
+                final_answer, last_trace.get("knowledge_text", ""), self.embedder,
+            )
+
+        # ⑦ 功能完成度（task_completion）：只要产出了非空回答且有正确意图就算「活干了」
         produced = bool(final_answer.strip())
         verdicts["task_completion"] = Verdict(produced, 1.0 if produced else 0.0, "正常作出回答")
 

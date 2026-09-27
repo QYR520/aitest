@@ -46,6 +46,33 @@ def judge_semantic(actual: str, expected: str, embedder: CharEmbedder,
     )
 
 
+def judge_faithfulness(answer: str, knowledge_text: str,
+                       embedder: CharEmbedder, threshold: float = 0.5) -> Verdict:
+    """忠实度（反幻觉）：回答是否编造了知识库里没有的内容。
+
+    对应业界 RAGAS 的 faithfulness——把回答拆成「事实声明」逐条对照检索到的
+    资料，看有没有无依据的编造。mock 项目用「回答 vs 资料」语义相似度近似：
+
+    1. 拒答语（抱歉/无法/没有相关信息）→ 没有任何事实声明，天然忠实；
+    2. 知识区为空却给了实质回答 → 典型幻觉（编造了库里不存在的事实）；
+    3. 知识区非空 → 取回答与资料每条的最大相似度作为忠实度，低于阈值判编造。
+
+    注意与 rejection 的区别：rejection 测「行为上该不该拒答」，faithfulness
+    测「内容上有没有编造」——是两把不同的尺子。
+    """
+    REJECT = ("抱歉", "无法", "没有相关信息")
+    if any(w in answer for w in REJECT):
+        return Verdict(True, 1.0, "拒答，未编造任何事实")
+    lines = [ln.strip() for ln in (knowledge_text or "").splitlines() if ln.strip()]
+    if not lines:
+        return Verdict(False, 0.0, f"知识区为空却回答「{answer[:30]}」，疑似幻觉")
+    sim = max(embedder.similarity(answer, ln) for ln in lines)
+    return Verdict(
+        sim >= threshold, round(sim, 4),
+        f"忠实度 {sim:.3f}（对资料最大相似度，阈值 {threshold}）",
+    )
+
+
 def judge_llm(actual: str, expected: str, embedder: CharEmbedder,
               keywords: list[str] | None = None) -> Verdict:
     """LLM-as-Judge：让「更强的模型」按标准打分。
