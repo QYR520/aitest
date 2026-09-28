@@ -15,6 +15,8 @@
 """
 from __future__ import annotations
 
+import json
+
 
 class NoopTracer:
     """未启用可观测时的空实现：什么都不做。"""
@@ -31,9 +33,10 @@ class NoopTracer:
 class LangfuseTracer:
     """把单个用例的测评结果（trace + verdicts）上报到 Langfuse。"""
 
-    def __init__(self, cfg: dict, model: str | None = None):
+    def __init__(self, cfg: dict, model: str | None = None, run_name: str = ""):
         self.cfg = cfg or {}
         self.model = model
+        self.run_name = run_name or ""
         self.enabled = True
         self._client = None
 
@@ -72,7 +75,12 @@ class LangfuseTracer:
             input=question,
             output=answer,
             metadata={"category": result.get("category", ""),
-                      "passed": bool(result.get("passed"))},
+                      "passed": bool(result.get("passed")),
+                      "run": self.run_name,
+                      "verdicts_json": json.dumps({
+                          d: {"passed": bool(v.passed), "score": round(float(v.score), 4)}
+                          for d, v in (result.get("verdicts") or {}).items()
+                      }, ensure_ascii=False)},
         ):
             # ① 意图路由
             with lf.start_as_current_observation(
@@ -136,6 +144,7 @@ def get_tracer(cfg: dict, model: str | None = None):
     public_key = c.get("public_key") or os.environ.get("LANGFUSE_PUBLIC_KEY", "")
     secret_key = c.get("secret_key") or os.environ.get("LANGFUSE_SECRET_KEY", "")
     host = c.get("host") or os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    run_name = os.environ.get("RUN_NAME", "")
     if not (public_key and secret_key):
         return NoopTracer()
     try:
@@ -146,4 +155,5 @@ def get_tracer(cfg: dict, model: str | None = None):
     return LangfuseTracer(
         {"public_key": public_key, "secret_key": secret_key, "host": host},
         model=model,
+        run_name=run_name,
     )

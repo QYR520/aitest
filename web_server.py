@@ -67,6 +67,8 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         if path in ("/", "/index.html"):
             self._send_file(os.path.join(WEB_DIR, "index.html"), "text/html; charset=utf-8")
+        elif path == "/compare":
+            self._send_compare_page()
         elif path == "/api/cases":
             self._json({"cases": [c["id"] for c in suite["cases"]],
                         "suite": cfg["run"]["suite_file"]})
@@ -106,6 +108,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self._api_injection_lab(body))
         elif path == "/api/ablation":
             self._json(self._api_ablation(body))
+        elif path == "/api/compare/refresh":
+            self._json(self._api_compare_refresh())
         elif path == "/api/custom_suite":
             self._json(self._api_custom_suite(body))
         else:
@@ -314,6 +318,26 @@ class Handler(BaseHTTPRequestHandler):
             return {"name": "custom", "editable": True,
                     "cases": (cs or {}).get("cases", [])}
         return {"name": "default", "editable": False, "cases": suite["cases"]}
+
+    # ---------- 实验对比（Langfuse 拉取 + 本地缓存） ----------
+    def _send_compare_page(self):
+        """GET /compare：返回实验历史对比页（reports/compare.html）。"""
+        path = os.path.join(BASE, "reports", "compare.html")
+        if not os.path.exists(path):
+            import build_compare_report as bcr
+            if bcr.refresh(offline=False) is None:
+                self._send(200, "text/html; charset=utf-8",
+                           "<h3>暂无对比数据，请先跑一次实验再生成。</h3>".encode("utf-8"))
+                return
+        self._send_file(path, "text/html; charset=utf-8")
+
+    def _api_compare_refresh(self):
+        """POST /api/compare/refresh：重新从 Langfuse 拉取并重渲染对比页。"""
+        import build_compare_report as bcr
+        payload = bcr.refresh(offline=False)
+        if payload is None:
+            return {"error": "没有可用的对比数据（既无 Langfuse 数据也无本地缓存）"}
+        return payload
 
     # ---------- 工具 ----------
     def _send_file(self, path, ctype):
